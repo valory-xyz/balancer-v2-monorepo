@@ -25,7 +25,6 @@ import { ethers } from 'hardhat';
 import { Artifact } from 'hardhat/types';
 
 let admin: SignerWithAddress;
-let manager: SignerWithAddress;
 let other: SignerWithAddress;
 let assetManager: Contract;
 let pool: WeightedPool;
@@ -35,7 +34,7 @@ let poolController: Contract;
 const WEIGHTS = [fp(30), fp(40), fp(30)];
 const PAUSE_WINDOW_DURATION = MONTH * 3;
 const BUFFER_PERIOD_DURATION = MONTH;
-const MIN_WEIGHT_CHANGE_DURATION = DAY;
+const MIN_WEIGHT_CHANGE_DURATION = DAY / 2;
 const POOL_SWAP_FEE_PERCENTAGE = fp(0.01);
 
 async function deployControllerAndPool(
@@ -52,6 +51,7 @@ async function deployControllerAndPool(
   swapEnabledOnStart = true,
   protocolSwapFeePercentage = MAX_UINT256
 ) {
+  [, admin, , other] = await ethers.getSigners();
   vault = await Vault.create({
     admin,
     pauseWindowDuration: PAUSE_WINDOW_DURATION,
@@ -59,7 +59,7 @@ async function deployControllerAndPool(
   });
 
   allTokens = await TokenList.create(['MKR', 'DAI', 'SNX'], { sorted: true });
-  await allTokens.mint({ to: manager, amount: fp(100) });
+  await allTokens.mint({ to: managerAddress, amount: fp(100) });
   await allTokens.mint({ to: other, amount: fp(100) });
 
   assetManager = await deploy('MockAssetManager', { args: [allTokens.DAI.address] });
@@ -100,6 +100,8 @@ async function deployControllerAndPool(
 
   console.log(`ManagedPoolController deployed at: ${poolController.address}`);
   console.log(`WeightedPool deployed at: ${pool.address}`);
+
+  await poolController.initialize(pool.address);
 }
 
 async function deployByArtifact(artifact: Artifact) {

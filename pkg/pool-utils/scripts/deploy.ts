@@ -32,14 +32,14 @@ let pool: WeightedPool;
 let allTokens: TokenList;
 let vault: Vault;
 let poolController: Contract;
-const WEIGHTS = [fp(30), fp(60), fp(5), fp(5)];
+const WEIGHTS = [fp(30), fp(40), fp(30)];
 const PAUSE_WINDOW_DURATION = MONTH * 3;
 const BUFFER_PERIOD_DURATION = MONTH;
 const MIN_WEIGHT_CHANGE_DURATION = DAY;
 const POOL_SWAP_FEE_PERCENTAGE = fp(0.01);
 
 async function deployControllerAndPool(
-  safeContractAddress: string,
+  managerAddress: string,
   canTransfer = true,
   canChangeSwapFee = true,
   canUpdateMetadata = true,
@@ -58,7 +58,7 @@ async function deployControllerAndPool(
     bufferPeriodDuration: BUFFER_PERIOD_DURATION,
   });
 
-  allTokens = await TokenList.create(['MKR', 'DAI', 'SNX', 'BAT'], { sorted: true });
+  allTokens = await TokenList.create(['MKR', 'DAI', 'SNX'], { sorted: true });
   await allTokens.mint({ to: manager, amount: fp(100) });
   await allTokens.mint({ to: other, amount: fp(100) });
 
@@ -80,7 +80,7 @@ async function deployControllerAndPool(
   };
 
   poolController = await deploy('ManagedPoolController', {
-    args: [basePoolRights, managedPoolRights, MIN_WEIGHT_CHANGE_DURATION, safeContractAddress],
+    args: [basePoolRights, managedPoolRights, MIN_WEIGHT_CHANGE_DURATION, managerAddress],
   });
   const assetManagers = Array(allTokens.length).fill(ZERO_ADDRESS);
   assetManagers[allTokens.indexOf(allTokens.DAI)] = assetManager.address;
@@ -159,13 +159,18 @@ async function deploySafeContract(singleton: Contract, safeFactory: Contract, de
 }
 
 async function main() {
+  const useSafeContracts = process.env.USE_SAFE_CONTRACTS;
+  let managerAddress = '0xFFcf8FDEE72ac11b5c542428B35EEF5769C409f0';
   const { gnosisSafeFactory, gnosisSafeL2, defaultCallbackHandler } = await deploySafeContractDeps();
-  const configuredSafeContractAddress = await deploySafeContract(
-    gnosisSafeL2,
-    gnosisSafeFactory,
-    defaultCallbackHandler
-  );
-  await deployControllerAndPool(configuredSafeContractAddress);
+  const configuredSafeAddress = await deploySafeContract(gnosisSafeL2, gnosisSafeFactory, defaultCallbackHandler);
+
+  if (useSafeContracts === 'true') {
+    managerAddress = configuredSafeAddress;
+  }
+
+  console.log(`Deploying pool and controller with manager ${managerAddress}`);
+
+  await deployControllerAndPool(managerAddress);
 }
 
 main().catch((error) => {

@@ -142,7 +142,7 @@ async function deploySafeContract(singleton: Contract, safeFactory: Contract, de
   ];
   const data = singleton.interface.encodeFunctionData('setup', [
     owners,
-    3, // 3/4
+    1, // 1/4
     nullAddress,
     '0x',
     defaultFallbackHandler.address,
